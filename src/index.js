@@ -28,6 +28,18 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/debug/ip', async (req, res) => {
+  try {
+    const response = await fetch('https://api.ipify.org?format=json', {
+      signal: AbortSignal.timeout(5000),
+    });
+    const data = await response.json();
+    res.json({ ip: data.ip });
+  } catch (error) {
+    res.status(500).json({ message: 'No se pudo obtener la IP', error: error.message });
+  }
+});
+
 app.use('/api/auth', authRoutes);
 
 app.use((req, res) => {
