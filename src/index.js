@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
+import mongoose from 'mongoose';
 import 'dotenv/config';
 import { connectDB } from './config/db.js';
 import { seedAdmin } from './seed.js';
@@ -18,7 +19,13 @@ app.get('/', (req, res) => {
 });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime() });
+  const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    db: states[mongoose.connection.readyState] ?? 'unknown',
+  });
 });
 
 app.use('/api/auth', authRoutes);
@@ -27,17 +34,12 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not Found' });
 });
 
-async function start() {
-  try {
-    await connectDB();
-    await seedAdmin();
-  } catch (error) {
+app.listen(PORT, () => {
+  console.log(`CyberThink API running on http://localhost:${PORT}`);
+});
+
+connectDB()
+  .then(() => seedAdmin())
+  .catch((error) => {
     console.error('No se pudo inicializar MongoDB:', error.message);
-  }
-
-  app.listen(PORT, () => {
-    console.log(`CyberThink API running on http://localhost:${PORT}`);
   });
-}
-
-start();
