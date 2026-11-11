@@ -4,8 +4,9 @@ import morgan from 'morgan';
 import mongoose from 'mongoose';
 import 'dotenv/config';
 import { connectDB } from './config/db.js';
-import { seedAdmin } from './seed.js';
+import { seedAdmin, seedContent } from './seed.js';
 import authRoutes from './routes/auth.js';
+import contentRoutes from './routes/content.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -41,6 +42,7 @@ app.get('/debug/ip', async (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api', contentRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not Found' });
@@ -51,7 +53,10 @@ app.listen(PORT, () => {
 });
 
 connectDB()
-  .then(() => seedAdmin())
+  .then(async () => {
+    await seedAdmin();
+    await seedContent();
+  })
   .catch((error) => {
     console.error('No se pudo inicializar MongoDB:', error.message);
   });
