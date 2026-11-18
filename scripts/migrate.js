@@ -9,6 +9,7 @@ import { Topic } from '../src/models/Topic.js';
 import { Lesson } from '../src/models/Lesson.js';
 import { Video } from '../src/models/Video.js';
 import { Quiz } from '../src/models/Quiz.js';
+import { Attempt } from '../src/models/Attempt.js';
 import { modules } from '../src/data/curriculum.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -72,6 +73,58 @@ async function migrateRoles() {
   }
 }
 
+function normalizeQuestionText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isValidStoredQuestion(question) {
+  return (
+    question &&
+    question.text &&
+    Array.isArray(question.options) &&
+    question.options.length === 4 &&
+    question.options.every((option) => String(option).trim()) &&
+    Number.isInteger(question.correctIndex) &&
+    question.correctIndex >= 0 &&
+    question.correctIndex < 4 &&
+    String(question.explanation || '').trim()
+  );
+}
+
+function mergeQuestions(existing, bank) {
+  const bankByText = new Map(
+    bank.map((question) => [normalizeQuestionText(question.text), question]),
+  );
+
+  const merged = (existing ?? []).map((question) => {
+    const bankQuestion = bankByText.get(normalizeQuestionText(question.text));
+
+    if (!bankQuestion) {
+      return question;
+    }
+
+    return isValidStoredQuestion(question) ? question : bankQuestion;
+  });
+
+  const texts = new Set(merged.map((question) => normalizeQuestionText(question.text)));
+
+  for (const question of bank) {
+    const text = normalizeQuestionText(question.text);
+
+    if (!texts.has(text)) {
+      merged.push(question);
+      texts.add(text);
+    }
+  }
+
+  return merged;
+}
+
 async function migrateContent() {
   let lessonCount = 0;
 
@@ -131,6 +184,13 @@ async function migrateContent() {
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     );
 
+    const existingQuiz = await Quiz.findOne({ topic: topic._id }).lean();
+    const questions = mergeQuestions(
+      existingQuiz?.questions,
+      data.quiz.questions,
+    );
+    const published = existingQuiz ? existingQuiz.published !== false : true;
+
     await Quiz.findOneAndUpdate(
       { topic: topic._id },
       {
@@ -139,17 +199,39 @@ async function migrateContent() {
           lesson: lastLesson?._id ?? null,
           title: data.quiz.title,
           passingScore: data.quiz.passingScore,
-          questions: data.quiz.questions,
-          published: true,
+          questions,
+          published,
         },
       },
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     );
 
-    console.log(`Módulo migrado: ${data.name} (3 lecciones, 1 video, 1 cuestionario)`);
+    console.log(
+      `Módulo migrado: ${data.name} (3 lecciones, 1 video, 1 cuestionario, ${questions.length} preguntas)`,
+    );
   }
 
   console.log(`Lecciones procesadas: ${lessonCount}`);
+}
+
+async function migrateAttempts() {
+  const result = await Attempt.updateMany(
+    { status: { $exists: false } },
+    [
+      {
+        $set: {
+          status: 'completed',
+          startedAt: { $ifNull: ['$startedAt', '$createdAt'] },
+          completedAt: { $ifNull: ['$completedAt', '$createdAt'] },
+        },
+      },
+    ],
+    { updatePipeline: true },
+  );
+
+  if (result.modifiedCount > 0) {
+    console.log(`Intentos antiguos marcados como completados: ${result.modifiedCount}`);
+  }
 }
 
 async function main() {
@@ -168,17 +250,19 @@ async function main() {
 
   await migrateRoles();
   await migrateContent();
+  await migrateAttempts();
 
-  const [users, topics, lessons, videos, quizzes] = await Promise.all([
+  const [users, topics, lessons, videos, quizzes, attempts] = await Promise.all([
     User.countDocuments(),
     Topic.countDocuments(),
     Lesson.countDocuments(),
     Video.countDocuments(),
     Quiz.countDocuments(),
+    Attempt.countDocuments(),
   ]);
 
   console.log('Migración completada');
-  console.log(`Usuarios: ${users} · Módulos: ${topics} · Lecciones: ${lessons} · Videos: ${videos} · Cuestionarios: ${quizzes}`);
+  console.log(`Usuarios: ${users} · Módulos: ${topics} · Lecciones: ${lessons} · Videos: ${videos} · Cuestionarios: ${quizzes} · Intentos: ${attempts}`);
 }
 
 try {

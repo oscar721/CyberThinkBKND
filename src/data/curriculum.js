@@ -1,3 +1,5 @@
+import { questionBanks } from './questionBank.js';
+
 export const modules = [
   {
     name: 'Contraseñas y autenticación',
@@ -506,3 +508,11 @@ export const modules = [
     },
   },
 ];
+
+for (const module of modules) {
+  const bank = questionBanks[module.slug];
+
+  if (bank) {
+    module.quiz.questions = bank;
+  }
+}

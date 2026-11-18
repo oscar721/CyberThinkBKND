@@ -8,6 +8,7 @@ import { seedAdmin, seedContent } from './seed.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import contentRoutes from './routes/content.js';
+import { startImageMaintenance } from './services/images.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -64,6 +65,7 @@ connectDB()
   .then(async () => {
     await seedAdmin();
     await seedContent();
+    startImageMaintenance();
   })
   .catch((error) => {
     console.error('No se pudo inicializar MongoDB:', error.message);

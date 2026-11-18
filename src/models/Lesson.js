@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { imageSchema } from './image.js';
 
 const lessonSchema = new mongoose.Schema(
   {
@@ -10,6 +11,7 @@ const lessonSchema = new mongoose.Schema(
     example: { type: String, default: '' },
     recommendations: { type: [String], default: [] },
     imageUrl: { type: String, default: '' },
+    image: { type: imageSchema, default: null },
     order: { type: Number, default: 0 },
     published: { type: Boolean, default: true },
   },
