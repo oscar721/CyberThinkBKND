@@ -12,9 +12,11 @@ const questionSchema = new mongoose.Schema(
 const quizSchema = new mongoose.Schema(
   {
     topic: { type: mongoose.Schema.Types.ObjectId, ref: 'Topic', required: true },
+    lesson: { type: mongoose.Schema.Types.ObjectId, ref: 'Lesson', default: null },
     title: { type: String, required: true, trim: true },
     passingScore: { type: Number, default: 70 },
     questions: { type: [questionSchema], default: [] },
+    published: { type: Boolean, default: true },
   },
   { timestamps: true },
 );

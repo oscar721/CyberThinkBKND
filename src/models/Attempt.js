@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const attemptSchema = new mongoose.Schema(
   {
     username: { type: String, required: true, trim: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     quiz: { type: mongoose.Schema.Types.ObjectId, ref: 'Quiz', required: true },
     score: { type: Number, required: true },
     passed: { type: Boolean, required: true },

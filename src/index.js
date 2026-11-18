@@ -6,13 +6,14 @@ import 'dotenv/config';
 import { connectDB } from './config/db.js';
 import { seedAdmin, seedContent } from './seed.js';
 import authRoutes from './routes/auth.js';
+import adminRoutes from './routes/admin.js';
 import contentRoutes from './routes/content.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(morgan('dev'));
 
 app.get('/', (req, res) => {
@@ -29,23 +30,30 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.get('/debug/ip', async (req, res) => {
-  try {
-    const response = await fetch('https://api.ipify.org?format=json', {
-      signal: AbortSignal.timeout(5000),
-    });
-    const data = await response.json();
-    res.json({ ip: data.ip });
-  } catch (error) {
-    res.status(500).json({ message: 'No se pudo obtener la IP', error: error.message });
-  }
-});
-
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api', contentRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not Found' });
+});
+
+app.use((error, req, res, next) => {
+  console.error(error);
+
+  if (res.headersSent) {
+    return next(error);
+  }
+
+  if (error?.name === 'ValidationError') {
+    return res.status(400).json({ message: error.message });
+  }
+
+  if (error?.code === 11000) {
+    return res.status(409).json({ message: 'Ya existe un registro con ese valor único' });
+  }
+
+  return res.status(500).json({ message: 'Error interno del servidor' });
 });
 
 app.listen(PORT, () => {
